@@ -3,6 +3,7 @@ package com.kaushal.automateme
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.provider.Telephony
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -50,6 +51,50 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         instance = null
         Log.d(TAG, "Accessibility Service unbound")
         return super.onUnbind(intent)
+    }
+
+    /**
+     * Returns a map of key device app roles to their installed package names.
+     * Passed to the AI so it knows which packages to use for open_app actions.
+     */
+    fun getDeviceContext(): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        try {
+            // Default SMS app (e.g. Truecaller, Google Messages, OEM messages)
+            val smsPkg = Telephony.Sms.getDefaultSmsPackage(this)
+            if (!smsPkg.isNullOrEmpty()) {
+                val label = getAppLabel(smsPkg)
+                result["default_sms_app"] = if (label != null) "$smsPkg ($label)" else smsPkg
+            }
+
+            // Default phone/dialer app
+            val dialerIntent = Intent(Intent.ACTION_DIAL).also { it.data = android.net.Uri.parse("tel:") }
+            val dialerInfo = packageManager.resolveActivity(dialerIntent, 0)
+            dialerInfo?.activityInfo?.packageName?.let { pkg ->
+                val label = getAppLabel(pkg)
+                result["default_dialer_app"] = if (label != null) "$pkg ($label)" else pkg
+            }
+
+            // Default browser
+            val browserIntent = Intent(Intent.ACTION_VIEW).also { it.data = android.net.Uri.parse("https://example.com") }
+            val browserInfo = packageManager.resolveActivity(browserIntent, 0)
+            browserInfo?.activityInfo?.packageName?.let { pkg ->
+                val label = getAppLabel(pkg)
+                result["default_browser_app"] = if (label != null) "$pkg ($label)" else pkg
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getDeviceContext: ${e.message}")
+        }
+        return result
+    }
+
+    private fun getAppLabel(packageName: String): String? {
+        return try {
+            val info = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(info).toString()
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /**

@@ -76,7 +76,10 @@ class ExecutionEngine(private val context: Context) {
         scope.launch(Dispatchers.IO) {
             try {
                 val (appPackage, visibleTexts) = accessibilityService.captureUiState()
+                // Detect installed default apps so AI knows which packages to use
+                val deviceContext = accessibilityService.getDeviceContext()
                 log("UI state captured: $appPackage, ${visibleTexts.size} text nodes")
+                log("Device context: $deviceContext")
 
                 scope.launch(Dispatchers.Main) {
                     listener?.onStatusUpdate("Asking AI for steps...")
@@ -86,7 +89,8 @@ class ExecutionEngine(private val context: Context) {
                     apiKey = apiKey,
                     appPackage = appPackage,
                     visibleTexts = visibleTexts,
-                    taskDescription = taskDescription
+                    taskDescription = taskDescription,
+                    deviceContext = deviceContext
                 )
 
                 scope.launch(Dispatchers.Main) {
@@ -102,7 +106,7 @@ class ExecutionEngine(private val context: Context) {
                     log("Received ${steps.size} steps from AI")
                     listener?.onStepsLoaded(steps, steps.size)
                     listener?.onStatusUpdate(
-                        "Steps loaded. ${if (isAutopilot) "Running autopilot..." else "Tap ▶ Next to execute."}"
+                        "Steps loaded. ${if (isAutopilot) "Running autopilot..." else "Tap \u25b6 Next to execute."}"
                     )
 
                     if (isAutopilot) {
@@ -176,7 +180,7 @@ class ExecutionEngine(private val context: Context) {
                     } else {
                         listener?.onStatusUpdate(
                             if (isAutopilot) "Running autopilot..."
-                            else "Step done. Tap ▶ Next to continue."
+                            else "Step done. Tap \u25b6 Next to continue."
                         )
                     }
                 }

@@ -73,18 +73,31 @@ object DeepSeekApiClient {
         }
     }
 
+    /**
+     * @param deviceContext  Map of role -> "package (App Label)" detected at runtime.
+     *                       e.g. {"default_sms_app": "com.truecaller (Truecaller)"}
+     *                       Injected into the prompt so the AI picks the right package for open_app.
+     */
     suspend fun getAutomationSteps(
         apiKey: String,
         appPackage: String,
         visibleTexts: List<String>,
-        taskDescription: String
+        taskDescription: String,
+        deviceContext: Map<String, String> = emptyMap()
     ): AIResponse? {
         return try {
+            val deviceAppsJson = if (deviceContext.isNotEmpty()) {
+                gson.toJson(deviceContext)
+            } else {
+                "{}"
+            }
+
             val uiStateJson = """
                 {
                   "app": "$appPackage",
                   "task": "$taskDescription",
-                  "visible_text": ${gson.toJson(visibleTexts)}
+                  "visible_text": ${gson.toJson(visibleTexts)},
+                  "device_apps": $deviceAppsJson
                 }
             """.trimIndent()
 
@@ -99,7 +112,14 @@ object DeepSeekApiClient {
                 - tap_text: tap on a UI element by its visible text (requires "value")
                 - scroll: scroll the screen (requires "direction": "up" or "down")
                 - extract_text: read all visible text on screen
-                - open_app: launch an app by package name (requires "value": package name, e.g. "com.google.android.apps.messaging" for SMS)
+                - open_app: launch an app by package name (requires "value": package name)
+                
+                IMPORTANT for open_app:
+                - Always use the package name from "device_apps" in the UI state when available.
+                - For SMS: use the value of "default_sms_app" from device_apps.
+                - For phone calls: use the value of "default_dialer_app" from device_apps.
+                - For web browsing: use the value of "default_browser_app" from device_apps.
+                - Strip any " (App Label)" suffix — use only the package name before the space.
                 
                 Rules:
                 - Maximum 10 steps
