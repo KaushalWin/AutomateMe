@@ -39,13 +39,13 @@ object DeepSeekApiClient {
     private val gson = Gson()
 
     /**
-     * Tests whether the given API key is valid by making a minimal completion request.
-     * Returns Pair(success, human-readable message).
+     * Tests whether the given API key is valid by making a minimal JSON completion request.
+     * NOTE: response_format=json_object requires the prompt to explicitly ask for JSON.
      */
     suspend fun testApiKey(apiKey: String): Pair<Boolean, String> {
         return try {
             val messages = listOf(
-                ChatMessage(role = "user", content = "Reply with exactly: OK")
+                ChatMessage(role = "user", content = "Respond with JSON: {\"status\": \"ok\"}")
             )
             val request = DeepSeekRequest(messages = messages)
             val response = service.getCompletion(
@@ -54,7 +54,7 @@ object DeepSeekApiClient {
             )
             val content = response.choices.firstOrNull()?.message?.content
             if (!content.isNullOrBlank()) {
-                Pair(true, "\u2705 API key is valid! Model replied: ${content.take(60)}")
+                Pair(true, "\u2705 API key is valid!")
             } else {
                 Pair(false, "\u274c API returned empty response")
             }
