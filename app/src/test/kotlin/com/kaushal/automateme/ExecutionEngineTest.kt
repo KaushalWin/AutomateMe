@@ -3,6 +3,11 @@ package com.kaushal.automateme
 import android.content.Context
 import com.kaushal.automateme.models.Step
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,7 +41,15 @@ class ExecutionEngineTest {
 
     @Before
     fun setUp() {
+        // ExecutionEngine creates CoroutineScope(Dispatchers.Main + Job()) in its constructor.
+        // Dispatchers.Main is unavailable on JVM by default, so we install a test dispatcher first.
+        Dispatchers.setMain(StandardTestDispatcher())
         engine = ExecutionEngine(mockContext)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     // -------------------------------------------------------------------------
