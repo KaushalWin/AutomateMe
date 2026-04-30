@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlayContainer"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/overlay_background"
+    android:padding="12dp"
+    android:elevation="8dp">
+
+    <!-- Header with drag handle -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🤖 AutomateMe"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvStepCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Step 0/0"
+            android:textColor="@color/text_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Step Summary -->
+    <TextView
+        android:id="@+id/tvStepSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ready to start..."
+        android:textColor="@color/teal_200"
+        android:textSize="13sp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:layout_marginBottom="12dp"
+        android:background="#1A2A3A"
+        android:padding="8dp" />
+
+    <!-- Buttons Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <!-- Stop Button -->
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="🔴 Stop"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:backgroundTint="@color/stop_button_color"
+            android:layout_marginEnd="4dp" />
+
+        <!-- Next Step Button -->
+        <Button
+            android:id="@+id/btnNextStep"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="▶ Next"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:backgroundTint="@color/next_step_color"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <!-- Autopilot Toggle -->
+        <Button
+            android:id="@+id/btnAutopilot"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="⚡ Auto"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:backgroundTint="@color/autopilot_off_color"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- Status text -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Idle"
+        android:textColor="@color/text_dim"
+        android:textSize="11sp"
+        android:gravity="center"
+        android:layout_marginTop="6dp" />
+
+</LinearLayout>
