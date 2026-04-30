@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -52,14 +53,26 @@ class MainActivity : AppCompatActivity() {
         updateStatusIndicators()
     }
 
-    /** Allows setting the task text via ADB:
-     *  adb shell am start -n com.kaushal.automateme/.MainActivity --es task "your task here"
+    /**
+     * Set the task field via ADB without touching the keyboard:
+     *   adb shell am start -n com.kaushal.automateme/.MainActivity --es task "your task"
+     * Works whether the app is already running or being freshly launched.
      */
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_TASK)?.takeIf { it.isNotBlank() }?.let { task ->
             binding.etTask.setText(task)
+            // Move cursor to end and immediately hide the keyboard
+            binding.etTask.setSelection(task.length)
+            hideKeyboard()
             addLog("Task set: $task")
         }
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        currentFocus?.let { imm.hideSoftInputFromWindow(it.windowToken, 0) }
+        // Also clear focus so the keyboard doesn't reappear on next touch
+        binding.root.clearFocus()
     }
 
     private fun setupUI() {
