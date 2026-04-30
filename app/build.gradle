@@ -41,18 +41,6 @@ android {
     }
 }
 
-// Attach MockK inline mock-maker agent so final Kotlin classes can be mocked in JVM unit tests
-afterEvaluate {
-    tasks.withType(Test).configureEach { task ->
-        def agentJar = configurations.testRuntimeClasspath.files.find {
-            it.name.contains('mockk-agent-jvm')
-        }
-        if (agentJar != null) {
-            task.jvmArgs "-javaagent:${agentJar}"
-        }
-    }
-}
-
 dependencies {
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
