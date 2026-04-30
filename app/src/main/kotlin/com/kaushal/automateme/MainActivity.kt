@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "AutomateMePrefs"
         private const val KEY_API_KEY = "api_key"
         private const val REQUEST_OVERLAY_PERMISSION = 1001
+        const val EXTRA_TASK = "task"
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -38,11 +39,27 @@ class MainActivity : AppCompatActivity() {
 
         setupUI()
         loadSavedApiKey()
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
         updateStatusIndicators()
+    }
+
+    /** Allows setting the task text via ADB:
+     *  adb shell am start -n com.kaushal.automateme/.MainActivity --es task "your task here"
+     */
+    private fun handleIntent(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_TASK)?.takeIf { it.isNotBlank() }?.let { task ->
+            binding.etTask.setText(task)
+            addLog("Task set: $task")
+        }
     }
 
     private fun setupUI() {
