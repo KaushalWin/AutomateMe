@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1A1A2E">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🤖 AutomateMe"
+            android:textColor="@color/white"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI-Powered UI Automation"
+            android:textColor="@color/text_dim"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginBottom="32dp" />
+
+        <!-- API Key Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="DeepSeek API Key"
+            android:textColor="@color/text_light"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilApiKey"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/api_key_hint"
+            app:boxStrokeColor="@color/purple_500"
+            app:hintTextColor="@color/text_dim"
+            android:layout_marginBottom="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textPassword"
+                android:textColor="@color/white" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/save_api_key"
+            android:layout_marginBottom="24dp"
+            app:backgroundTint="@color/purple_500" />
+
+        <!-- Task Input Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Automation Task"
+            android:textColor="@color/text_light"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilTask"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/task_hint"
+            app:boxStrokeColor="@color/teal_200"
+            app:hintTextColor="@color/text_dim"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etTask"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:textColor="@color/white" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Status Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Accessibility: "
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvAccessibilityStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="❌ Disabled"
+                android:textColor="#FFE53935"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Overlay: "
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvOverlayStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="❌ Not granted"
+                android:textColor="#FFE53935"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Permission Buttons -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEnableAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/enable_accessibility"
+            android:layout_marginBottom="8dp"
+            app:backgroundTint="@color/teal_700" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGrantOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/grant_overlay"
+            android:layout_marginBottom="16dp"
+            app:backgroundTint="@color/teal_700" />
+
+        <!-- Start/Stop Buttons -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStartAutomation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/start_automation"
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:layout_marginBottom="8dp"
+            app:backgroundTint="@color/next_step_color" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStopAutomation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/stop_automation"
+            android:textSize="16sp"
+            android:layout_marginBottom="24dp"
+            app:backgroundTint="@color/stop_button_color" />
+
+        <!-- Log Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Execution Log"
+            android:textColor="@color/text_light"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:background="#0D1117"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#FF00FF41"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </ScrollView>
+
+    </LinearLayout>
+</ScrollView>
