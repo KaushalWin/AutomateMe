@@ -37,13 +37,6 @@ android {
         unitTests {
             includeAndroidResources = true
             returnDefaultValues = true
-            all {
-                // Attach MockK agent so final/Kotlin classes can be mocked inline
-                def agentJar = classpath.find { it.name.contains('mockk-agent-jvm') }
-                if (agentJar != null) {
-                    jvmArgs "-javaagent:${agentJar}"
-                }
-            }
         }
     }
 }
@@ -63,10 +56,9 @@ dependencies {
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
 
-    // Unit tests
+    // Unit tests — MockK uses SubclassMockMaker (byte-buddy) for open classes, no javaagent needed
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'io.mockk:mockk:1.13.12'
-    testImplementation 'io.mockk:mockk-agent-jvm:1.13.12'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0'
     testImplementation 'com.google.code.gson:gson:2.11.0'
 
