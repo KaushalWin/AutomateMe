@@ -17,6 +17,8 @@ class ExecutionEngine(private val context: Context) {
         const val MAX_STEPS = 15
         const val STEP_DELAY_MS = 500L
         private const val OPEN_APP_WAIT_MS = 2500L
+        /** Wait after a tap before re-querying AI so the new screen has time to settle. */
+        private const val TAP_NAV_WAIT_MS = 1200L
     }
 
     interface Listener {
@@ -170,11 +172,19 @@ class ExecutionEngine(private val context: Context) {
                 val result = executor.execute(step)
                 delay(STEP_DELAY_MS)
 
-                // After a successful open_app, wait for the app to load then re-query AI
+                // After open_app or a navigation tap, wait for the UI to settle then re-query AI
                 var newSteps: List<Step>? = null
-                if (step.action == ActionExecutor.ACTION_OPEN_APP && result != null) {
-                    log("Re-querying AI after opening ${step.value}...")
-                    delay(OPEN_APP_WAIT_MS)
+                val isNavTap = step.action == ActionExecutor.ACTION_TAP_TEXT && result != null &&
+                    step.summary?.let { s ->
+                        val lower = s.lowercase()
+                        lower.contains("tab") || lower.contains("open") ||
+                        lower.contains("messages") || lower.contains("navigate") ||
+                        lower.contains("go to") || lower.contains("inbox")
+                    } == true
+                if ((step.action == ActionExecutor.ACTION_OPEN_APP && result != null) || isNavTap) {
+                    val waitMs = if (step.action == ActionExecutor.ACTION_OPEN_APP) OPEN_APP_WAIT_MS else TAP_NAV_WAIT_MS
+                    log("Re-querying AI after ${if (isNavTap) "navigation tap" else "opening ${step.value}"}...")
+                    delay(waitMs)
                     val (appPackage, visibleTexts) = accessibilityService.captureUiState()
                     val deviceContext = accessibilityService.getDeviceContext()
                     newSteps = DeepSeekApiClient.getAutomationSteps(

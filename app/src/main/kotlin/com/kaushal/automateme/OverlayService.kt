@@ -249,7 +249,9 @@ class OverlayService : Service() {
         }
 
         override fun onSummary(summary: String) {
-            tvStatus?.text = summary
+            // Show summary prominently in the step summary box (teal, larger text)
+            tvStepSummary?.text = "\uD83D\uDCCB Summary:\n$summary"
+            tvStatus?.text = "\u2705 AI Summary ready"
             Log.d(TAG, "Summary: $summary")
         }
     }

@@ -201,23 +201,25 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
             return false
         }
         return try {
-            val nodes = root.findAccessibilityNodeInfosByText(text)
+            // 1. Standard text/contentDescription search
+            var nodes = root.findAccessibilityNodeInfosByText(text)
+
+            // 2. Fallback: traverse tree searching contentDescription (catches icon-only nav tabs)
+            if (nodes.isNullOrEmpty()) {
+                val descNode = findNodeByContentDescription(root, text)
+                if (descNode != null) nodes = listOf(descNode)
+            }
+
             if (nodes.isNullOrEmpty()) {
                 Log.w(TAG, "tapText: no nodes found for text='$text'")
                 false
             } else {
                 var clicked = false
                 for (node in nodes) {
-                    if (node.isClickable) {
-                        clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        if (clicked) break
-                    } else {
-                        val parent = node.parent
-                        if (parent?.isClickable == true) {
-                            clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                            parent.recycle()
-                            if (clicked) break
-                        }
+                    // Walk up to 8 levels to find a clickable ancestor (handles nested nav groups)
+                    if (clickNodeOrAncestor(node)) {
+                        clicked = true
+                        break
                     }
                 }
                 Log.d(TAG, "tapText: text='$text', result=$clicked")
@@ -226,6 +228,43 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         } finally {
             root.recycle()
         }
+    }
+
+    /**
+     * Tries to perform ACTION_CLICK on [start]. If not clickable, walks up the parent
+     * chain (up to 8 levels) to find the first clickable ancestor.
+     * Handles nested view groups like bottom-nav tabs where only the outer container is clickable.
+     */
+    private fun clickNodeOrAncestor(start: AccessibilityNodeInfo): Boolean {
+        if (start.isClickable) return start.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        var ancestor: AccessibilityNodeInfo? = start.parent ?: return false
+        repeat(8) {
+            val current = ancestor ?: return false
+            if (current.isClickable) {
+                val result = current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                current.recycle()
+                return result
+            }
+            val next = current.parent
+            current.recycle()
+            ancestor = next
+        }
+        return false
+    }
+
+    /**
+     * Recursively searches for a node whose contentDescription contains [desc] (case-insensitive).
+     * Used as a fallback when findAccessibilityNodeInfosByText returns nothing.
+     */
+    private fun findNodeByContentDescription(node: AccessibilityNodeInfo?, desc: String): AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.contentDescription?.toString()?.contains(desc, ignoreCase = true) == true) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findNodeByContentDescription(child, desc)
+            if (found != null) return found
+        }
+        return null
     }
 
     /** Scrolls the screen in the given direction ("down" or "up"). */
