@@ -16,6 +16,7 @@ class ExecutionEngine(private val context: Context) {
         private const val TAG = "ExecutionEngine"
         const val MAX_STEPS = 15
         const val STEP_DELAY_MS = 500L
+        private const val OPEN_APP_WAIT_MS = 2500L
     }
 
     interface Listener {
@@ -25,6 +26,7 @@ class ExecutionEngine(private val context: Context) {
         fun onError(message: String)
         fun onComplete()
         fun onLog(message: String)
+        fun onSummary(summary: String)
     }
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -36,6 +38,10 @@ class ExecutionEngine(private val context: Context) {
     private var isAutopilot = false
     private var listener: Listener? = null
     private var executionJob: Job? = null
+
+    private var savedApiKey = ""
+    private var savedTask = ""
+    private var extractedTextBuffer = StringBuilder()
 
     fun setListener(listener: Listener?) {
         this.listener = listener
@@ -69,6 +75,9 @@ class ExecutionEngine(private val context: Context) {
         stepsLoaded = false
         currentStepIndex = 0
         steps = emptyList()
+        savedApiKey = apiKey
+        savedTask = taskDescription
+        extractedTextBuffer = StringBuilder()
 
         listener?.onStatusUpdate("Capturing UI state...")
         log("Starting automation: $taskDescription")
@@ -141,7 +150,7 @@ class ExecutionEngine(private val context: Context) {
         if (currentStepIndex >= steps.size) {
             log("All steps completed")
             isRunning = false
-            listener?.onComplete()
+            finalizeSummary()
             return
         }
 
@@ -161,9 +170,38 @@ class ExecutionEngine(private val context: Context) {
                 val result = executor.execute(step)
                 delay(STEP_DELAY_MS)
 
+                // After a successful open_app, wait for the app to load then re-query AI
+                var newSteps: List<Step>? = null
+                if (step.action == ActionExecutor.ACTION_OPEN_APP && result != null) {
+                    log("Re-querying AI after opening ${step.value}...")
+                    delay(OPEN_APP_WAIT_MS)
+                    val (appPackage, visibleTexts) = accessibilityService.captureUiState()
+                    val deviceContext = accessibilityService.getDeviceContext()
+                    newSteps = DeepSeekApiClient.getAutomationSteps(
+                        apiKey = savedApiKey,
+                        appPackage = appPackage,
+                        visibleTexts = visibleTexts,
+                        taskDescription = savedTask,
+                        deviceContext = deviceContext
+                    )?.steps?.take(MAX_STEPS)
+                }
+
                 scope.launch(Dispatchers.Main) {
                     val stepIndex = currentStepIndex
                     currentStepIndex++
+
+                    if (step.action == ActionExecutor.ACTION_EXTRACT_TEXT && result != null) {
+                        extractedTextBuffer.append(result).append("\n")
+                    }
+
+                    if (newSteps != null) {
+                        // Replace all pending steps with the fresh AI response
+                        steps = steps.take(currentStepIndex) + newSteps
+                        stepsLoaded = true
+                        listener?.onStepsLoaded(steps, steps.size)
+                        log("Re-queried AI: ${newSteps.size} new steps after open_app")
+                    }
+
                     listener?.onStepExecuted(step, stepIndex + 1, steps.size, result)
 
                     if (result == null) {
@@ -176,7 +214,7 @@ class ExecutionEngine(private val context: Context) {
                     if (currentStepIndex >= steps.size) {
                         log("All steps executed")
                         isRunning = false
-                        listener?.onComplete()
+                        finalizeSummary()
                     } else {
                         listener?.onStatusUpdate(
                             if (isAutopilot) "Running autopilot..."
@@ -201,13 +239,39 @@ class ExecutionEngine(private val context: Context) {
             while (isRunning && isAutopilot && currentStepIndex < steps.size) {
                 val indexBefore = currentStepIndex
                 executeNextStep()
-                // Wait for step to complete (up to 3 seconds)
+                // Wait up to 15 seconds for step to complete (open_app + AI re-query can take ~8s)
                 var waited = 0
-                while (waited < 30 && currentStepIndex == indexBefore && isRunning) {
+                while (waited < 150 && currentStepIndex == indexBefore && isRunning) {
                     delay(100L)
                     waited++
                 }
                 delay(300L) // extra delay between steps
+            }
+        }
+    }
+
+    /**
+     * Called when all steps have been executed. Emits onComplete and, if any text was
+     * extracted during the run, requests a DeepSeek summary and emits it via onSummary.
+     */
+    private fun finalizeSummary() {
+        listener?.onComplete()
+        val extracted = extractedTextBuffer.toString().trim()
+        extractedTextBuffer = StringBuilder() // clear to prevent duplicate triggers
+        if (extracted.isNotEmpty()) {
+            listener?.onStatusUpdate("Summarizing extracted text...")
+            scope.launch(Dispatchers.IO) {
+                val summary = DeepSeekApiClient.summarizeText(
+                    apiKey = savedApiKey,
+                    extractedText = extracted,
+                    task = savedTask
+                )
+                scope.launch(Dispatchers.Main) {
+                    if (summary != null) {
+                        log("Summary: $summary")
+                        listener?.onSummary(summary)
+                    }
+                }
             }
         }
     }
