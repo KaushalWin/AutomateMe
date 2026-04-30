@@ -2,9 +2,8 @@ package com.kaushal.automateme
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.role.RoleManager
 import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -15,7 +14,7 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     companion object {
         private const val TAG = "AutomateA11yService"
 
-        /** Ordered list of known SMS app packages to check as fallback. */
+        /** Ordered list of known SMS app packages to check as last-resort fallback. */
         private val KNOWN_SMS_PACKAGES = listOf(
             "com.truecaller",
             "com.google.android.apps.messaging",
@@ -68,10 +67,11 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
      * Returns a map of key device app roles to their installed package names.
      * Passed to the AI so it knows which packages to use for open_app actions.
      *
-     * Strategy (SMS):
-     *   1. Telephony.Sms.getDefaultSmsPackage() — standard API
-     *   2. RoleManager.getRoleHolders(ROLE_SMS) — Android 10+, OEM-safe
-     *   3. Scan KNOWN_SMS_PACKAGES via PackageManager (requires <queries> in manifest)
+     * SMS detection strategy (in order):
+     *   1. Telephony.Sms.getDefaultSmsPackage() — standard system API
+     *   2. Resolve ACTION_SENDTO smsto: intent — works when queries are declared
+     *   3. Resolve ACTION_VIEW sms: intent
+     *   4. Scan KNOWN_SMS_PACKAGES via PackageManager (requires <queries> in manifest)
      */
     fun getDeviceContext(): Map<String, String> {
         val result = mutableMapOf<String, String>()
@@ -80,27 +80,23 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
             if (!smsPkg.isNullOrEmpty()) {
                 val label = getAppLabel(smsPkg)
                 result["default_sms_app"] = if (label != null) "$smsPkg ($label)" else smsPkg
-                Log.d(TAG, "getDeviceContext: SMS app = ${result["default_sms_app"]}")
+                Log.d(TAG, "getDeviceContext: SMS = ${result["default_sms_app"]}")
             } else {
                 Log.w(TAG, "getDeviceContext: could not resolve default SMS app")
             }
 
             // Default dialer
-            val dialerIntent = Intent(Intent.ACTION_DIAL).also {
-                it.data = android.net.Uri.parse("tel:")
-            }
-            val dialerInfo = packageManager.resolveActivity(dialerIntent, 0)
-            dialerInfo?.activityInfo?.packageName?.let { pkg ->
+            val dialerIntent = Intent(Intent.ACTION_DIAL).apply { data = Uri.parse("tel:") }
+            packageManager.resolveActivity(dialerIntent, 0)?.activityInfo?.packageName?.let { pkg ->
                 val label = getAppLabel(pkg)
                 result["default_dialer_app"] = if (label != null) "$pkg ($label)" else pkg
             }
 
             // Default browser
-            val browserIntent = Intent(Intent.ACTION_VIEW).also {
-                it.data = android.net.Uri.parse("https://example.com")
+            val browserIntent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse("https://example.com")
             }
-            val browserInfo = packageManager.resolveActivity(browserIntent, 0)
-            browserInfo?.activityInfo?.packageName?.let { pkg ->
+            packageManager.resolveActivity(browserIntent, 0)?.activityInfo?.packageName?.let { pkg ->
                 val label = getAppLabel(pkg)
                 result["default_browser_app"] = if (label != null) "$pkg ($label)" else pkg
             }
@@ -112,10 +108,11 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     }
 
     /**
-     * Resolves the default SMS app package name via multiple fallback strategies.
+     * Resolves the default SMS app package using multiple fallback strategies.
+     * getRoleHolders() is @SystemApi so we use public APIs only.
      */
     private fun resolveDefaultSmsPackage(): String? {
-        // 1. Standard Telephony API
+        // 1. Standard Telephony API (bypasses package visibility — uses system roles)
         try {
             val pkg = Telephony.Sms.getDefaultSmsPackage(this)
             if (!pkg.isNullOrEmpty()) {
@@ -126,29 +123,38 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
             Log.w(TAG, "Telephony.Sms.getDefaultSmsPackage failed: ${e.message}")
         }
 
-        // 2. RoleManager (Android 10+) — works on OEM ROMs that override Telephony API
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val roleManager = getSystemService(RoleManager::class.java)
-                val holders = roleManager?.getRoleHolders(RoleManager.ROLE_SMS)
-                val pkg = holders?.firstOrNull()
-                if (!pkg.isNullOrEmpty()) {
-                    Log.d(TAG, "resolveDefaultSmsPackage via RoleManager: $pkg")
-                    return pkg
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "RoleManager SMS lookup failed: ${e.message}")
+        // 2. Resolve via ACTION_SENDTO smsto: — the canonical SMS compose intent
+        try {
+            val intent = Intent(Intent.ACTION_SENDTO).apply { data = Uri.parse("smsto:") }
+            val pkg = packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+            if (!pkg.isNullOrEmpty()) {
+                Log.d(TAG, "resolveDefaultSmsPackage via ACTION_SENDTO smsto: $pkg")
+                return pkg
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "ACTION_SENDTO smsto resolution failed: ${e.message}")
         }
 
-        // 3. Scan known packages (requires <queries> entries in manifest)
+        // 3. Resolve via ACTION_VIEW sms:
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("sms:") }
+            val pkg = packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+            if (!pkg.isNullOrEmpty()) {
+                Log.d(TAG, "resolveDefaultSmsPackage via ACTION_VIEW sms: $pkg")
+                return pkg
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "ACTION_VIEW sms resolution failed: ${e.message}")
+        }
+
+        // 4. Scan known packages (requires <queries> entries in manifest)
         for (pkg in KNOWN_SMS_PACKAGES) {
             try {
                 packageManager.getApplicationInfo(pkg, 0)
                 Log.d(TAG, "resolveDefaultSmsPackage via known list: $pkg")
                 return pkg
             } catch (e: Exception) {
-                // Not installed or not visible — try next
+                // Not visible or not installed — try next
             }
         }
 
@@ -164,19 +170,15 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         }
     }
 
-    /**
-     * Captures the current UI state: package name and list of visible texts.
-     */
+    /** Captures the current UI state: package name and list of visible texts. */
     override fun captureUiState(): Pair<String, List<String>> {
         val texts = mutableListOf<String>()
         val root = rootInActiveWindow ?: return Pair(currentPackage, texts)
-
         try {
             collectTexts(root, texts)
         } finally {
             root.recycle()
         }
-
         Log.d(TAG, "Captured UI state: $currentPackage with ${texts.size} text nodes")
         return Pair(currentPackage, texts)
     }
@@ -184,21 +186,15 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     private fun collectTexts(node: AccessibilityNodeInfo?, texts: MutableList<String>) {
         if (node == null) return
         val text = node.text?.toString()
-        if (!text.isNullOrBlank()) {
-            texts.add(text)
-        }
+        if (!text.isNullOrBlank()) texts.add(text)
         val desc = node.contentDescription?.toString()
-        if (!desc.isNullOrBlank() && desc != text) {
-            texts.add(desc)
-        }
+        if (!desc.isNullOrBlank() && desc != text) texts.add(desc)
         for (i in 0 until node.childCount) {
             collectTexts(node.getChild(i), texts)
         }
     }
 
-    /**
-     * Taps a UI node that contains the given text.
-     */
+    /** Taps a UI node that contains the given text. */
     override fun tapText(text: String): Boolean {
         val root = rootInActiveWindow ?: run {
             Log.w(TAG, "tapText: rootInActiveWindow is null")
@@ -214,18 +210,17 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
                 for (node in nodes) {
                     if (node.isClickable) {
                         clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        Log.d(TAG, "tapText: clicked node with text='$text', result=$clicked")
                         if (clicked) break
                     } else {
                         val parent = node.parent
-                        if (parent != null && parent.isClickable) {
+                        if (parent?.isClickable == true) {
                             clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                            Log.d(TAG, "tapText: clicked parent for text='$text', result=$clicked")
                             parent.recycle()
                             if (clicked) break
                         }
                     }
                 }
+                Log.d(TAG, "tapText: text='$text', result=$clicked")
                 clicked
             }
         } finally {
@@ -233,9 +228,7 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         }
     }
 
-    /**
-     * Scrolls the screen in the given direction ("down" or "up").
-     */
+    /** Scrolls the screen in the given direction ("down" or "up"). */
     override fun scroll(direction: String): Boolean {
         val root = rootInActiveWindow ?: run {
             Log.w(TAG, "scroll: rootInActiveWindow is null")
@@ -244,11 +237,10 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         return try {
             val scrollableNode = findScrollableNode(root)
             if (scrollableNode != null) {
-                val action = if (direction.lowercase() == "up") {
+                val action = if (direction.lowercase() == "up")
                     AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-                } else {
+                else
                     AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-                }
                 val result = scrollableNode.performAction(action)
                 Log.d(TAG, "scroll: direction=$direction, result=$result")
                 result
@@ -265,24 +257,19 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         if (node == null) return null
         if (node.isScrollable) return node
         for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            val scrollable = findScrollableNode(child)
+            val scrollable = findScrollableNode(node.getChild(i))
             if (scrollable != null) return scrollable
         }
         return null
     }
 
-    /**
-     * Extracts all visible text from the current screen.
-     */
+    /** Extracts all visible text from the current screen. */
     override fun extractText(): List<String> {
         val (_, texts) = captureUiState()
         return texts
     }
 
-    /**
-     * Launches an app by its package name.
-     */
+    /** Launches an app by its package name. */
     override fun launchApp(packageName: String): Boolean {
         return try {
             val intent = packageManager.getLaunchIntentForPackage(packageName)
@@ -292,11 +279,11 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
                 Log.d(TAG, "launchApp: launched $packageName")
                 true
             } else {
-                Log.w(TAG, "launchApp: no launch intent found for $packageName")
+                Log.w(TAG, "launchApp: no launch intent for $packageName")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "launchApp: failed to launch $packageName: ${e.message}")
+            Log.e(TAG, "launchApp: failed $packageName: ${e.message}")
             false
         }
     }
