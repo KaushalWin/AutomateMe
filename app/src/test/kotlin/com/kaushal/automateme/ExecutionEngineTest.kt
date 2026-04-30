@@ -29,6 +29,7 @@ class ExecutionEngineTest {
         val logs = mutableListOf<String>()
         val errors = mutableListOf<String>()
         val statusUpdates = mutableListOf<String>()
+        val summaries = mutableListOf<String>()
         var completeCalled = false
 
         override fun onStepsLoaded(steps: List<Step>, totalCount: Int) {}
@@ -37,6 +38,7 @@ class ExecutionEngineTest {
         override fun onError(message: String) { errors.add(message) }
         override fun onComplete() { completeCalled = true }
         override fun onLog(message: String) { logs.add(message) }
+        override fun onSummary(summary: String) { summaries.add(summary) }
     }
 
     @Before
