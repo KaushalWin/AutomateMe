@@ -11,5 +11,11 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <!--
+            Android 15 (API 35) enforces edge-to-edge when targetSdk=35.
+            Opt out here for layout compatibility; migrate to proper insets handling
+            in a future update if full edge-to-edge layout is desired.
+        -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
     </style>
 </resources>
