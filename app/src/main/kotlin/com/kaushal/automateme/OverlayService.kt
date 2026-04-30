@@ -247,6 +247,11 @@ class OverlayService : Service() {
         override fun onLog(message: String) {
             Log.d(TAG, "Engine: $message")
         }
+
+        override fun onSummary(summary: String) {
+            tvStatus?.text = summary
+            Log.d(TAG, "Summary: $summary")
+        }
     }
 
     // -------------------------------------------------------------------------
