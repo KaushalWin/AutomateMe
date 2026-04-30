@@ -8,8 +8,9 @@
     android:padding="12dp"
     android:elevation="8dp">
 
-    <!-- Header with drag handle -->
+    <!-- Header — drag this to reposition the overlay -->
     <LinearLayout
+        android:id="@+id/overlayDragHandle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -20,7 +21,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🤖 AutomateMe"
+            android:text="&#x1F916; AutomateMe"
             android:textColor="@color/white"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -61,7 +62,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="🔴 Stop"
+            android:text="&#x1F534; Stop"
             android:textColor="@color/white"
             android:textSize="12sp"
             android:backgroundTint="@color/stop_button_color"
@@ -73,7 +74,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="▶ Next"
+            android:text="&#x25b6; Next"
             android:textColor="@color/white"
             android:textSize="12sp"
             android:backgroundTint="@color/next_step_color"
@@ -86,7 +87,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="⚡ Auto"
+            android:text="&#x26a1; Auto"
             android:textColor="@color/white"
             android:textSize="12sp"
             android:backgroundTint="@color/autopilot_off_color"
