@@ -3,7 +3,7 @@ package com.kaushal.automateme
 import android.util.Log
 import com.kaushal.automateme.models.Step
 
-class ActionExecutor(private val service: AutomateAccessibilityService) {
+class ActionExecutor(private val service: UiInteractor) {
 
     companion object {
         private const val TAG = "ActionExecutor"

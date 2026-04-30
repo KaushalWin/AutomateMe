@@ -11,17 +11,17 @@ import org.junit.Test
 
 /**
  * Unit tests for [ActionExecutor].
- * AutomateAccessibilityService is mocked so no Android runtime is required.
+ * [UiInteractor] is mocked — no Android runtime or accessibility service required.
  */
 class ActionExecutorTest {
 
-    private lateinit var mockService: AutomateAccessibilityService
+    private lateinit var mockUi: UiInteractor
     private lateinit var executor: ActionExecutor
 
     @Before
     fun setUp() {
-        mockService = mockk(relaxed = true)
-        executor = ActionExecutor(mockService)
+        mockUi = mockk(relaxed = true)
+        executor = ActionExecutor(mockUi)
     }
 
     // -------------------------------------------------------------------------
@@ -30,15 +30,15 @@ class ActionExecutorTest {
 
     @Test
     fun `tap_text with valid value and successful tap returns result string`() {
-        every { mockService.tapText("Login") } returns true
+        every { mockUi.tapText("Login") } returns true
         val step = Step(action = ActionExecutor.ACTION_TAP_TEXT, value = "Login", summary = "Tap login")
         assertEquals("Tapped: Login", executor.execute(step))
-        verify(exactly = 1) { mockService.tapText("Login") }
+        verify(exactly = 1) { mockUi.tapText("Login") }
     }
 
     @Test
     fun `tap_text when tapText returns false yields null`() {
-        every { mockService.tapText("Login") } returns false
+        every { mockUi.tapText("Login") } returns false
         val step = Step(action = ActionExecutor.ACTION_TAP_TEXT, value = "Login", summary = "Tap login")
         assertNull(executor.execute(step))
     }
@@ -47,14 +47,14 @@ class ActionExecutorTest {
     fun `tap_text with null value returns null without calling service`() {
         val step = Step(action = ActionExecutor.ACTION_TAP_TEXT, value = null, summary = "Tap")
         assertNull(executor.execute(step))
-        verify(exactly = 0) { mockService.tapText(any()) }
+        verify(exactly = 0) { mockUi.tapText(any()) }
     }
 
     @Test
     fun `tap_text with blank value returns null without calling service`() {
         val step = Step(action = ActionExecutor.ACTION_TAP_TEXT, value = "   ", summary = "Tap")
         assertNull(executor.execute(step))
-        verify(exactly = 0) { mockService.tapText(any()) }
+        verify(exactly = 0) { mockUi.tapText(any()) }
     }
 
     // -------------------------------------------------------------------------
@@ -63,38 +63,38 @@ class ActionExecutorTest {
 
     @Test
     fun `scroll with direction=down calls service and returns success`() {
-        every { mockService.scroll("down") } returns true
+        every { mockUi.scroll("down") } returns true
         val step = Step(action = ActionExecutor.ACTION_SCROLL, direction = "down", summary = "Scroll down")
         assertEquals("Scrolled down", executor.execute(step))
-        verify(exactly = 1) { mockService.scroll("down") }
+        verify(exactly = 1) { mockUi.scroll("down") }
     }
 
     @Test
     fun `scroll with direction=up calls service and returns success`() {
-        every { mockService.scroll("up") } returns true
+        every { mockUi.scroll("up") } returns true
         val step = Step(action = ActionExecutor.ACTION_SCROLL, direction = "up", summary = "Scroll up")
         assertEquals("Scrolled up", executor.execute(step))
     }
 
     @Test
     fun `scroll uses value as fallback when direction is null`() {
-        every { mockService.scroll("up") } returns true
+        every { mockUi.scroll("up") } returns true
         val step = Step(action = ActionExecutor.ACTION_SCROLL, direction = null, value = "up", summary = "Scroll")
         assertEquals("Scrolled up", executor.execute(step))
-        verify(exactly = 1) { mockService.scroll("up") }
+        verify(exactly = 1) { mockUi.scroll("up") }
     }
 
     @Test
     fun `scroll defaults to down when both direction and value are null`() {
-        every { mockService.scroll("down") } returns true
+        every { mockUi.scroll("down") } returns true
         val step = Step(action = ActionExecutor.ACTION_SCROLL, direction = null, value = null, summary = "Scroll")
         assertEquals("Scrolled down", executor.execute(step))
-        verify(exactly = 1) { mockService.scroll("down") }
+        verify(exactly = 1) { mockUi.scroll("down") }
     }
 
     @Test
     fun `scroll when service returns false still returns failure string`() {
-        every { mockService.scroll("down") } returns false
+        every { mockUi.scroll("down") } returns false
         val step = Step(action = ActionExecutor.ACTION_SCROLL, direction = "down", summary = "Scroll")
         assertEquals("Scroll failed", executor.execute(step))
     }
@@ -105,22 +105,22 @@ class ActionExecutorTest {
 
     @Test
     fun `extract_text returns joined text from service`() {
-        every { mockService.extractText() } returns listOf("Hello", "World", "Test")
+        every { mockUi.extractText() } returns listOf("Hello", "World", "Test")
         val step = Step(action = ActionExecutor.ACTION_EXTRACT_TEXT, summary = "Extract text")
         assertEquals("Hello\nWorld\nTest", executor.execute(step))
-        verify(exactly = 1) { mockService.extractText() }
+        verify(exactly = 1) { mockUi.extractText() }
     }
 
     @Test
     fun `extract_text with single item returns that item`() {
-        every { mockService.extractText() } returns listOf("Only item")
+        every { mockUi.extractText() } returns listOf("Only item")
         val step = Step(action = ActionExecutor.ACTION_EXTRACT_TEXT, summary = "Extract text")
         assertEquals("Only item", executor.execute(step))
     }
 
     @Test
     fun `extract_text with empty list returns empty string`() {
-        every { mockService.extractText() } returns emptyList()
+        every { mockUi.extractText() } returns emptyList()
         val step = Step(action = ActionExecutor.ACTION_EXTRACT_TEXT, summary = "Extract text")
         assertEquals("", executor.execute(step))
     }
