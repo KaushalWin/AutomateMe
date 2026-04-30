@@ -161,4 +161,46 @@ object DeepSeekApiClient {
             null
         }
     }
+
+    /**
+     * Summarizes extracted screen text in context of the user's task.
+     * Asks the model for JSON {"summary": "..."} and returns the summary string, or null on failure.
+     */
+    suspend fun summarizeText(apiKey: String, extractedText: String, task: String): String? {
+        return try {
+            val messages = listOf(
+                ChatMessage(
+                    role = "system",
+                    content = "You are a helpful assistant. Summarize the provided screen text in context of the user's task. Be concise and focus on relevant information. Return ONLY valid JSON in this exact format: {\"summary\": \"your summary here\"}"
+                ),
+                ChatMessage(
+                    role = "user",
+                    content = "Task: $task\n\nExtracted screen text:\n$extractedText\n\nProvide a concise summary as JSON."
+                )
+            )
+            val request = DeepSeekRequest(messages = messages)
+            val response = service.getCompletion(
+                authorization = "Bearer $apiKey",
+                request = request
+            )
+            val rawContent = response.choices.firstOrNull()?.message?.content
+            Log.d(TAG, "Summarize Raw Response: $rawContent")
+            if (rawContent != null) {
+                val cleanContent = rawContent
+                    .trim()
+                    .removePrefix("```json")
+                    .removePrefix("```")
+                    .removeSuffix("```")
+                    .trim()
+                @Suppress("UNCHECKED_CAST")
+                val parsed = gson.fromJson(cleanContent, Map::class.java) as? Map<String, Any>
+                parsed?.get("summary") as? String
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in summarizeText: ${e.message}", e)
+            null
+        }
+    }
 }
