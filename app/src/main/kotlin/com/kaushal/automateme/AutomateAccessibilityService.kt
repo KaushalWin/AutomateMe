@@ -2,7 +2,9 @@ package com.kaushal.automateme
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.role.RoleManager
 import android.content.Intent
+import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -12,6 +14,15 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
 
     companion object {
         private const val TAG = "AutomateA11yService"
+
+        /** Ordered list of known SMS app packages to check as fallback. */
+        private val KNOWN_SMS_PACKAGES = listOf(
+            "com.truecaller",
+            "com.google.android.apps.messaging",
+            "com.android.mms",
+            "com.samsung.android.messaging",
+            "com.jio.myjio"
+        )
 
         @Volatile
         var instance: AutomateAccessibilityService? = null
@@ -56,19 +67,28 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     /**
      * Returns a map of key device app roles to their installed package names.
      * Passed to the AI so it knows which packages to use for open_app actions.
+     *
+     * Strategy (SMS):
+     *   1. Telephony.Sms.getDefaultSmsPackage() — standard API
+     *   2. RoleManager.getRoleHolders(ROLE_SMS) — Android 10+, OEM-safe
+     *   3. Scan KNOWN_SMS_PACKAGES via PackageManager (requires <queries> in manifest)
      */
     fun getDeviceContext(): Map<String, String> {
         val result = mutableMapOf<String, String>()
         try {
-            // Default SMS app (e.g. Truecaller, Google Messages, OEM messages)
-            val smsPkg = Telephony.Sms.getDefaultSmsPackage(this)
+            val smsPkg = resolveDefaultSmsPackage()
             if (!smsPkg.isNullOrEmpty()) {
                 val label = getAppLabel(smsPkg)
                 result["default_sms_app"] = if (label != null) "$smsPkg ($label)" else smsPkg
+                Log.d(TAG, "getDeviceContext: SMS app = ${result["default_sms_app"]}")
+            } else {
+                Log.w(TAG, "getDeviceContext: could not resolve default SMS app")
             }
 
-            // Default phone/dialer app
-            val dialerIntent = Intent(Intent.ACTION_DIAL).also { it.data = android.net.Uri.parse("tel:") }
+            // Default dialer
+            val dialerIntent = Intent(Intent.ACTION_DIAL).also {
+                it.data = android.net.Uri.parse("tel:")
+            }
             val dialerInfo = packageManager.resolveActivity(dialerIntent, 0)
             dialerInfo?.activityInfo?.packageName?.let { pkg ->
                 val label = getAppLabel(pkg)
@@ -76,7 +96,9 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
             }
 
             // Default browser
-            val browserIntent = Intent(Intent.ACTION_VIEW).also { it.data = android.net.Uri.parse("https://example.com") }
+            val browserIntent = Intent(Intent.ACTION_VIEW).also {
+                it.data = android.net.Uri.parse("https://example.com")
+            }
             val browserInfo = packageManager.resolveActivity(browserIntent, 0)
             browserInfo?.activityInfo?.packageName?.let { pkg ->
                 val label = getAppLabel(pkg)
@@ -85,7 +107,52 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
         } catch (e: Exception) {
             Log.w(TAG, "getDeviceContext: ${e.message}")
         }
+        Log.d(TAG, "getDeviceContext result: $result")
         return result
+    }
+
+    /**
+     * Resolves the default SMS app package name via multiple fallback strategies.
+     */
+    private fun resolveDefaultSmsPackage(): String? {
+        // 1. Standard Telephony API
+        try {
+            val pkg = Telephony.Sms.getDefaultSmsPackage(this)
+            if (!pkg.isNullOrEmpty()) {
+                Log.d(TAG, "resolveDefaultSmsPackage via Telephony: $pkg")
+                return pkg
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Telephony.Sms.getDefaultSmsPackage failed: ${e.message}")
+        }
+
+        // 2. RoleManager (Android 10+) — works on OEM ROMs that override Telephony API
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val roleManager = getSystemService(RoleManager::class.java)
+                val holders = roleManager?.getRoleHolders(RoleManager.ROLE_SMS)
+                val pkg = holders?.firstOrNull()
+                if (!pkg.isNullOrEmpty()) {
+                    Log.d(TAG, "resolveDefaultSmsPackage via RoleManager: $pkg")
+                    return pkg
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "RoleManager SMS lookup failed: ${e.message}")
+            }
+        }
+
+        // 3. Scan known packages (requires <queries> entries in manifest)
+        for (pkg in KNOWN_SMS_PACKAGES) {
+            try {
+                packageManager.getApplicationInfo(pkg, 0)
+                Log.d(TAG, "resolveDefaultSmsPackage via known list: $pkg")
+                return pkg
+            } catch (e: Exception) {
+                // Not installed or not visible — try next
+            }
+        }
+
+        return null
     }
 
     private fun getAppLabel(packageName: String): String? {
