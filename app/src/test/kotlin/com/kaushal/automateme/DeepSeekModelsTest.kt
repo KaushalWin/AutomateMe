@@ -103,12 +103,15 @@ class DeepSeekModelsTest {
 
     @Test
     fun `DeepSeekResponse deserializes from API JSON`() {
+        // Content is a plain string — no inner JSON quotes needed for this structural test.
+        // Using escaped quotes inside triple-quoted Kotlin strings produces literal backslashes
+        // which break Gson parsing, so we keep the content value simple.
         val json = """
             {
               "id": "chat-abc123",
               "choices": [
                 {
-                  "message": {"role": "assistant", "content": "{\\"steps\\":[]}"},
+                  "message": {"role": "assistant", "content": "automation steps loaded"},
                   "finish_reason": "stop"
                 }
               ]
@@ -118,6 +121,7 @@ class DeepSeekModelsTest {
         assertEquals("chat-abc123", resp.id)
         assertEquals(1, resp.choices.size)
         assertEquals("assistant", resp.choices[0].message.role)
+        assertEquals("automation steps loaded", resp.choices[0].message.content)
         assertEquals("stop", resp.choices[0].finishReason)
     }
 
