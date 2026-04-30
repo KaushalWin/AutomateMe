@@ -7,7 +7,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
-class AutomateAccessibilityService : AccessibilityService() {
+open class AutomateAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AutomateA11yService"
@@ -55,7 +55,7 @@ class AutomateAccessibilityService : AccessibilityService() {
     /**
      * Captures the current UI state: package name and list of visible texts.
      */
-    fun captureUiState(): Pair<String, List<String>> {
+    open fun captureUiState(): Pair<String, List<String>> {
         val texts = mutableListOf<String>()
         val root = rootInActiveWindow ?: return Pair(currentPackage, texts)
 
@@ -88,7 +88,7 @@ class AutomateAccessibilityService : AccessibilityService() {
      * Taps a UI node that contains the given text.
      * Returns true if successful.
      */
-    fun tapText(text: String): Boolean {
+    open fun tapText(text: String): Boolean {
         val root = rootInActiveWindow ?: run {
             Log.w(TAG, "tapText: rootInActiveWindow is null")
             return false
@@ -126,7 +126,7 @@ class AutomateAccessibilityService : AccessibilityService() {
      * Scrolls the screen in the given direction.
      * direction: "down" or "up"
      */
-    fun scroll(direction: String): Boolean {
+    open fun scroll(direction: String): Boolean {
         val root = rootInActiveWindow ?: run {
             Log.w(TAG, "scroll: rootInActiveWindow is null")
             return false
@@ -165,7 +165,7 @@ class AutomateAccessibilityService : AccessibilityService() {
     /**
      * Extracts all visible text from the current screen.
      */
-    fun extractText(): List<String> {
+    open fun extractText(): List<String> {
         val (_, texts) = captureUiState()
         return texts
     }

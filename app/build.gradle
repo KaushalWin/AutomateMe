@@ -37,6 +37,13 @@ android {
         unitTests {
             includeAndroidResources = true
             returnDefaultValues = true
+            all {
+                // Attach MockK agent so final/Kotlin classes can be mocked inline
+                def agentJar = classpath.find { it.name.contains('mockk-agent-jvm') }
+                if (agentJar != null) {
+                    jvmArgs "-javaagent:${agentJar}"
+                }
+            }
         }
     }
 }
