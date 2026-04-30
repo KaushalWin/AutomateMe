@@ -126,6 +126,40 @@ class ActionExecutorTest {
     }
 
     // -------------------------------------------------------------------------
+    // open_app
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `open_app with valid package name and successful launch returns result string`() {
+        every { mockUi.launchApp("com.google.android.apps.messaging") } returns true
+        val step = Step(
+            action = ActionExecutor.ACTION_OPEN_APP,
+            value = "com.google.android.apps.messaging",
+            summary = "Open Messages"
+        )
+        assertEquals("Opened app: com.google.android.apps.messaging", executor.execute(step))
+        verify(exactly = 1) { mockUi.launchApp("com.google.android.apps.messaging") }
+    }
+
+    @Test
+    fun `open_app when launch fails returns null`() {
+        every { mockUi.launchApp(any()) } returns false
+        val step = Step(
+            action = ActionExecutor.ACTION_OPEN_APP,
+            value = "com.unknown.app",
+            summary = "Open unknown app"
+        )
+        assertNull(executor.execute(step))
+    }
+
+    @Test
+    fun `open_app with missing value returns null without calling service`() {
+        val step = Step(action = ActionExecutor.ACTION_OPEN_APP, value = null, summary = "Open app")
+        assertNull(executor.execute(step))
+        verify(exactly = 0) { mockUi.launchApp(any()) }
+    }
+
+    // -------------------------------------------------------------------------
     // unknown action
     // -------------------------------------------------------------------------
 

@@ -32,6 +32,7 @@ class ExecutionEngine(private val context: Context) {
     private var steps: List<Step> = emptyList()
     private var currentStepIndex = 0
     private var isRunning = false
+    private var stepsLoaded = false
     private var isAutopilot = false
     private var listener: Listener? = null
     private var executionJob: Job? = null
@@ -65,6 +66,7 @@ class ExecutionEngine(private val context: Context) {
         }
 
         isRunning = true
+        stepsLoaded = false
         currentStepIndex = 0
         steps = emptyList()
 
@@ -89,15 +91,19 @@ class ExecutionEngine(private val context: Context) {
 
                 scope.launch(Dispatchers.Main) {
                     if (aiResponse == null || aiResponse.steps.isEmpty()) {
-                        listener?.onError("No steps received from AI")
+                        listener?.onError("No steps received from AI. Check API key and network.")
                         isRunning = false
+                        stepsLoaded = false
                         return@launch
                     }
 
                     steps = aiResponse.steps.take(MAX_STEPS)
+                    stepsLoaded = true
                     log("Received ${steps.size} steps from AI")
                     listener?.onStepsLoaded(steps, steps.size)
-                    listener?.onStatusUpdate("Steps loaded. ${if (isAutopilot) "Running autopilot..." else "Tap Next Step to execute."}")
+                    listener?.onStatusUpdate(
+                        "Steps loaded. ${if (isAutopilot) "Running autopilot..." else "Tap ▶ Next to execute."}"
+                    )
 
                     if (isAutopilot) {
                         runAutopilot()
@@ -108,6 +114,7 @@ class ExecutionEngine(private val context: Context) {
                 scope.launch(Dispatchers.Main) {
                     listener?.onError("Error: ${e.message}")
                     isRunning = false
+                    stepsLoaded = false
                 }
             }
         }
@@ -115,10 +122,16 @@ class ExecutionEngine(private val context: Context) {
 
     /**
      * Executes the next step manually.
+     * If steps have not loaded yet (AI is still responding), shows a waiting message.
      */
     fun executeNextStep() {
         if (!isRunning) {
             log("Not running")
+            return
+        }
+        if (!stepsLoaded) {
+            log("Steps not loaded yet, waiting for AI response")
+            listener?.onStatusUpdate("⏳ Waiting for AI response...")
             return
         }
         if (currentStepIndex >= steps.size) {
@@ -139,31 +152,38 @@ class ExecutionEngine(private val context: Context) {
         listener?.onStatusUpdate("Executing: ${step.summary}")
 
         scope.launch(Dispatchers.IO) {
-            val executor = ActionExecutor(accessibilityService)
-            val result = executor.execute(step)
-            delay(STEP_DELAY_MS)
+            try {
+                val executor = ActionExecutor(accessibilityService)
+                val result = executor.execute(step)
+                delay(STEP_DELAY_MS)
 
-            scope.launch(Dispatchers.Main) {
-                val stepIndex = currentStepIndex
-                currentStepIndex++
-                listener?.onStepExecuted(step, stepIndex + 1, steps.size, result)
+                scope.launch(Dispatchers.Main) {
+                    val stepIndex = currentStepIndex
+                    currentStepIndex++
+                    listener?.onStepExecuted(step, stepIndex + 1, steps.size, result)
 
-                if (result == null) {
-                    log("Step ${stepIndex + 1} failed: ${step.action}")
-                    listener?.onStatusUpdate("Step failed. Try next step.")
-                } else {
-                    log("Step ${stepIndex + 1} result: $result")
+                    if (result == null) {
+                        log("Step ${stepIndex + 1} failed: ${step.action}")
+                        listener?.onStatusUpdate("Step failed. Try next step.")
+                    } else {
+                        log("Step ${stepIndex + 1} result: $result")
+                    }
+
+                    if (currentStepIndex >= steps.size) {
+                        log("All steps executed")
+                        isRunning = false
+                        listener?.onComplete()
+                    } else {
+                        listener?.onStatusUpdate(
+                            if (isAutopilot) "Running autopilot..."
+                            else "Step done. Tap ▶ Next to continue."
+                        )
+                    }
                 }
-
-                if (currentStepIndex >= steps.size) {
-                    log("All steps executed")
-                    isRunning = false
-                    listener?.onComplete()
-                } else {
-                    listener?.onStatusUpdate(
-                        if (isAutopilot) "Running autopilot..."
-                        else "Step done. Tap Next to continue."
-                    )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error executing step: ${e.message}", e)
+                scope.launch(Dispatchers.Main) {
+                    listener?.onError("Step error: ${e.message}")
                 }
             }
         }
@@ -194,6 +214,7 @@ class ExecutionEngine(private val context: Context) {
     fun stop() {
         isRunning = false
         isAutopilot = false
+        stepsLoaded = false
         executionJob?.cancel()
         log("Automation stopped")
         listener?.onStatusUpdate("Stopped.")

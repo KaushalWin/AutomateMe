@@ -116,21 +116,42 @@ class OverlayService : Service() {
         var initialY = 0
         var touchX = 0f
         var touchY = 0f
+        var isDragging = false
+        val dragThreshold = 10f
 
-        overlayView?.setOnTouchListener { _, event ->
+        // Attach drag only to the header area (title + step count row), not the buttons.
+        // This allows buttons to receive their own click events normally.
+        val dragHandle = overlayView?.findViewById<View>(R.id.overlayDragHandle)
+            ?: overlayView // fallback to root if no drag handle id found
+
+        dragHandle?.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     touchX = event.rawX
                     touchY = event.rawY
-                    true
+                    isDragging = false
+                    false // don't consume — let child views (buttons) handle their own touches
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (touchX - event.rawX).toInt()
-                    params.y = initialY + (event.rawY - touchY).toInt()
-                    windowManager?.updateViewLayout(overlayView, params)
-                    true
+                    val dx = Math.abs(event.rawX - touchX)
+                    val dy = Math.abs(event.rawY - touchY)
+                    if (dx > dragThreshold || dy > dragThreshold) {
+                        isDragging = true
+                    }
+                    if (isDragging) {
+                        params.x = initialX + (touchX - event.rawX).toInt()
+                        params.y = initialY + (event.rawY - touchY).toInt()
+                        windowManager?.updateViewLayout(overlayView, params)
+                        true
+                    } else {
+                        false
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    isDragging = false
+                    false
                 }
                 else -> false
             }
@@ -138,6 +159,10 @@ class OverlayService : Service() {
     }
 
     private fun setupButtons() {
+        // Next Step is disabled until the AI has loaded steps
+        btnNextStep?.isEnabled = false
+        btnNextStep?.alpha = 0.4f
+
         btnStop?.setOnClickListener {
             engine?.stop()
             stopSelf()
@@ -157,13 +182,18 @@ class OverlayService : Service() {
         }
     }
 
+    private fun setNextStepEnabled(enabled: Boolean) {
+        btnNextStep?.isEnabled = enabled
+        btnNextStep?.alpha = if (enabled) 1.0f else 0.4f
+    }
+
     private fun updateAutopilotButton() {
         if (isAutopilot) {
-            btnAutopilot?.text = "⚡ AUTO ON"
+            btnAutopilot?.text = "\u26a1 AUTO ON"
             btnAutopilot?.backgroundTintList =
                 resources.getColorStateList(R.color.autopilot_on_color, theme)
         } else {
-            btnAutopilot?.text = "⚡ Auto"
+            btnAutopilot?.text = "\u26a1 Auto"
             btnAutopilot?.backgroundTintList =
                 resources.getColorStateList(R.color.autopilot_off_color, theme)
         }
@@ -186,6 +216,7 @@ class OverlayService : Service() {
 
     private val engineListener = object : ExecutionEngine.Listener {
         override fun onStepsLoaded(steps: List<Step>, totalCount: Int) {
+            setNextStepEnabled(true)
             tvStepCount?.text = "Step 0/$totalCount"
             val firstSummary = steps.firstOrNull()?.summary ?: "Ready"
             tvStepSummary?.text = firstSummary
@@ -202,12 +233,14 @@ class OverlayService : Service() {
         }
 
         override fun onError(message: String) {
-            tvStatus?.text = "Error: $message"
+            setNextStepEnabled(false)
+            tvStatus?.text = "\u274c $message"
             Log.e(TAG, message)
         }
 
         override fun onComplete() {
-            tvStatus?.text = "✅ Done"
+            setNextStepEnabled(false)
+            tvStatus?.text = "\u2705 Done"
             tvStepSummary?.text = "Automation complete"
         }
 

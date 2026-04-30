@@ -7,6 +7,7 @@ import com.kaushal.automateme.models.ChatMessage
 import com.kaushal.automateme.models.DeepSeekRequest
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -37,6 +38,41 @@ object DeepSeekApiClient {
 
     private val gson = Gson()
 
+    /**
+     * Tests whether the given API key is valid by making a minimal completion request.
+     * Returns Pair(success, human-readable message).
+     */
+    suspend fun testApiKey(apiKey: String): Pair<Boolean, String> {
+        return try {
+            val messages = listOf(
+                ChatMessage(role = "user", content = "Reply with exactly: OK")
+            )
+            val request = DeepSeekRequest(messages = messages)
+            val response = service.getCompletion(
+                authorization = "Bearer $apiKey",
+                request = request
+            )
+            val content = response.choices.firstOrNull()?.message?.content
+            if (!content.isNullOrBlank()) {
+                Pair(true, "\u2705 API key is valid! Model replied: ${content.take(60)}")
+            } else {
+                Pair(false, "\u274c API returned empty response")
+            }
+        } catch (e: HttpException) {
+            val msg = when (e.code()) {
+                401 -> "\u274c Invalid API key (401 Unauthorized)"
+                402 -> "\u274c Insufficient balance (402 Payment Required)"
+                429 -> "\u274c Rate limit exceeded (429)"
+                else -> "\u274c HTTP error ${e.code()}: ${e.message()}"
+            }
+            Log.w(TAG, "testApiKey HTTP error: ${e.code()}")
+            Pair(false, msg)
+        } catch (e: Exception) {
+            Log.w(TAG, "testApiKey failed: ${e.message}")
+            Pair(false, "\u274c Connection failed: ${e.message}")
+        }
+    }
+
     suspend fun getAutomationSteps(
         apiKey: String,
         appPackage: String,
@@ -55,27 +91,21 @@ object DeepSeekApiClient {
             val systemPrompt = """
                 You are an Android UI automation assistant. Given the current UI state, suggest the next automation steps.
                 
-                IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
-                {
-                  "steps": [
-                    {
-                      "action": "tap_text",
-                      "value": "button text to tap",
-                      "summary": "Brief description"
-                    }
-                  ]
-                }
+                IMPORTANT: You MUST respond with ONLY valid JSON — no markdown, no code blocks, no extra text.
+                Use this exact format:
+                {"steps":[{"action":"tap_text","value":"button text","summary":"Brief description"}]}
                 
                 Available actions:
-                - tap_text: tap on a UI element by its text (requires "value")
+                - tap_text: tap on a UI element by its visible text (requires "value")
                 - scroll: scroll the screen (requires "direction": "up" or "down")
                 - extract_text: read all visible text on screen
+                - open_app: launch an app by package name (requires "value": package name, e.g. "com.google.android.apps.messaging" for SMS)
                 
                 Rules:
                 - Maximum 10 steps
                 - Only use text visible on screen for tap_text
                 - Keep summaries under 10 words
-                - Return ONLY JSON, no other text
+                - Return ONLY the JSON object, nothing else
             """.trimIndent()
 
             val messages = listOf(
@@ -89,11 +119,19 @@ object DeepSeekApiClient {
                 request = request
             )
 
-            val content = response.choices.firstOrNull()?.message?.content
-            Log.d(TAG, "AI Response: $content")
+            val rawContent = response.choices.firstOrNull()?.message?.content
+            Log.d(TAG, "AI Raw Response: $rawContent")
 
-            if (content != null) {
-                gson.fromJson(content, AIResponse::class.java)
+            if (rawContent != null) {
+                // Strip markdown code fences the model may emit despite instructions
+                val cleanContent = rawContent
+                    .trim()
+                    .removePrefix("```json")
+                    .removePrefix("```")
+                    .removeSuffix("```")
+                    .trim()
+                Log.d(TAG, "AI Clean Response: $cleanContent")
+                gson.fromJson(cleanContent, AIResponse::class.java)
             } else {
                 Log.e(TAG, "Empty response from API")
                 null

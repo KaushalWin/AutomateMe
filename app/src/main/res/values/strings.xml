@@ -6,6 +6,7 @@
     <string name="start_automation">Start Automation</string>
     <string name="stop_automation">Stop Automation</string>
     <string name="save_api_key">Save API Key</string>
+    <string name="test_api_key">&#x1F511; Test API Key</string>
     <string name="enable_accessibility">Enable Accessibility Service</string>
     <string name="grant_overlay">Grant Overlay Permission</string>
     <string name="task_hint">Describe task (e.g. Read latest HDFC message)</string>

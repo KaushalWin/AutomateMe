@@ -9,7 +9,12 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.kaushal.automateme.databinding.ActivityMainBinding
+import com.kaushal.automateme.network.DeepSeekApiClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -48,8 +53,28 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             prefs.edit().putString(KEY_API_KEY, key).apply()
-            Toast.makeText(this, "API key saved ✓", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "API key saved \u2713", Toast.LENGTH_SHORT).show()
             addLog("API key saved")
+        }
+
+        binding.btnTestApiKey.setOnClickListener {
+            val key = binding.etApiKey.text?.toString()?.trim() ?: ""
+            if (key.isBlank()) {
+                Toast.makeText(this, "Please enter an API key first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            binding.btnTestApiKey.isEnabled = false
+            binding.btnTestApiKey.text = "Testing..."
+            addLog("Testing API key...")
+            lifecycleScope.launch {
+                val (success, message) = withContext(Dispatchers.IO) {
+                    DeepSeekApiClient.testApiKey(key)
+                }
+                addLog(message)
+                binding.btnTestApiKey.isEnabled = true
+                binding.btnTestApiKey.text = getString(R.string.test_api_key)
+                Toast.makeText(this@MainActivity, message.take(80), Toast.LENGTH_LONG).show()
+            }
         }
 
         binding.btnEnableAccessibility.setOnClickListener {
@@ -90,9 +115,9 @@ class MainActivity : AppCompatActivity() {
     private fun updateStatusIndicators() {
         val accessibilityEnabled = AutomateAccessibilityService.isRunning()
         binding.tvAccessibilityStatus.text = if (accessibilityEnabled) {
-            "✅ Enabled"
+            "\u2705 Enabled"
         } else {
-            "❌ Disabled"
+            "\u274c Disabled"
         }
         binding.tvAccessibilityStatus.setTextColor(
             if (accessibilityEnabled) getColor(android.R.color.holo_green_dark)
@@ -102,7 +127,7 @@ class MainActivity : AppCompatActivity() {
         val overlayGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Settings.canDrawOverlays(this)
         } else true
-        binding.tvOverlayStatus.text = if (overlayGranted) "✅ Granted" else "❌ Not granted"
+        binding.tvOverlayStatus.text = if (overlayGranted) "\u2705 Granted" else "\u274c Not granted"
         binding.tvOverlayStatus.setTextColor(
             if (overlayGranted) getColor(android.R.color.holo_green_dark)
             else getColor(android.R.color.holo_red_dark)

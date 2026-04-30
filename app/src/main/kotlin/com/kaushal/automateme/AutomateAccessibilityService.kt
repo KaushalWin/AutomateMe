@@ -86,7 +86,6 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
 
     /**
      * Taps a UI node that contains the given text.
-     * Returns true if successful.
      */
     override fun tapText(text: String): Boolean {
         val root = rootInActiveWindow ?: run {
@@ -123,8 +122,7 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     }
 
     /**
-     * Scrolls the screen in the given direction.
-     * direction: "down" or "up"
+     * Scrolls the screen in the given direction ("down" or "up").
      */
     override fun scroll(direction: String): Boolean {
         val root = rootInActiveWindow ?: run {
@@ -168,5 +166,26 @@ open class AutomateAccessibilityService : AccessibilityService(), UiInteractor {
     override fun extractText(): List<String> {
         val (_, texts) = captureUiState()
         return texts
+    }
+
+    /**
+     * Launches an app by its package name.
+     */
+    override fun launchApp(packageName: String): Boolean {
+        return try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                Log.d(TAG, "launchApp: launched $packageName")
+                true
+            } else {
+                Log.w(TAG, "launchApp: no launch intent found for $packageName")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "launchApp: failed to launch $packageName: ${e.message}")
+            false
+        }
     }
 }
