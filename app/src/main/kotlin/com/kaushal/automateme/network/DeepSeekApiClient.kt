@@ -17,11 +17,17 @@ object DeepSeekApiClient {
     private const val TAG = "DeepSeekApiClient"
     private const val BASE_URL = "https://api.deepseek.com/"
 
+    // 🛡️ SAFETY: Log headers only (never BODY — would expose API key + full prompt in logcat)
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.HEADERS
     }
 
+    // 🛡️ SAFETY: Quota interceptor — tracks daily request count on-device
+    //            Blocks further calls once DAILY_REQUEST_LIMIT is reached.
+    private val quotaInterceptor = ApiQuotaInterceptor()
+
     private val okHttpClient = OkHttpClient.Builder()
+        .addInterceptor(quotaInterceptor)   // quota check runs BEFORE the request leaves device
         .addInterceptor(loggingInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
